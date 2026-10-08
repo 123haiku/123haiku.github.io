@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>JSmol Test Viewer</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="text/javascript" src="JSmol.min.js"></script>
+</head>
+<body>
+
+  <h2>JSmol 3D Molecular Viewer</h2>
+
+  <div id="viewer-container">
+    <script type="text/javascript">
+      // JSmol initialization parameters
+      var Info = {
+        serverURL: null,           // No PHP server needed for online databases
+        disableInitialConsole: true,
+        // Loads caffeine directly from the public NCI CACTVS server on launch
+        script: "load $caffeine; spin on; set antialiasDisplay true;"
+      };
+
+      // Create the JSmol object
+      var myJmol = Jmol.getApplet("myJmol", Info);
+    </script>
+  </div>
+
+  <div class="controls">
+    <button onclick="Jmol.script(myJmol, 'spin on')">Spin On</button>
+    <button onclick="Jmol.script(myJmol, 'spin off')">Spin Off</button>
+    <button onclick="Jmol.script(myJmol, 'load $aspirin; spin on;')">Load Aspirin</button>
+    <button onclick="Jmol.script(myJmol, 'load $benzene; spin on;')">Load Benzene</button>
+  </div>
+
+</body>
+</html>
