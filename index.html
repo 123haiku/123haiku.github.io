@@ -44,7 +44,6 @@
 </div>
 
 <script>
-  // Point to the secure Cloudflare tunnel URL
   const API_BASE = "https://gender-fioricet-clinical-incidents.trycloudflare.com";
 
   async function fetchCompletedVideos() {
@@ -54,7 +53,7 @@
       const data = await res.json();
 
       if (!data.videos || data.videos.length === 0) {
-        listEl.innerHTML = `<li style="color: #71717a; font-size: 13px;">No completed videos yet.</li>`;
+        listEl.innerHTML = `<li style="color: #71717a; font-size: 13px;">No completed videos available.</li>`;
         return;
       }
 
@@ -62,9 +61,11 @@
         <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #33333d;">
           <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;" title="${v.filename}">
             <span style="color: #e4e4e7; font-size: 14px;">${v.filename}</span><br/>
-            <span style="color: #71717a; font-size: 12px;">${v.size_mb} MB</span>
+            <span style="color: #71717a; font-size: 12px;">${v.size_mb} MB (Deleted after saving)</span>
           </div>
-          <a href="${v.download_url}" download style="background: #2563eb; color: #fff; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold;">
+          <a href="${v.download_url}" 
+             onclick="setTimeout(fetchCompletedVideos, 3000)"
+             style="background: #2563eb; color: #fff; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; cursor: pointer;">
             Save
           </a>
         </li>
@@ -116,7 +117,6 @@
     }
   }
 
-  // Load files when page loads
   fetchCompletedVideos();
 </script>
 </body>
