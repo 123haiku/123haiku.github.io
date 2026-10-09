@@ -1,36 +1,84 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <meta charset="utf-8">
-  <title>JSmol Test Viewer</title>
-  <link rel="stylesheet" href="style.css">
-  <script type="text/javascript" src="JSmol.min.js"></script>
+    <meta charset="utf-8">
+    <title>JSmol Test Viewer</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="text/javascript" src="JSmol.min.js"></script>
 </head>
+
 <body>
 
-  <h2>JSmol 3D Molecular Viewer</h2>
+    <h2>JSmol 3D Molecular Viewer</h2>
+    <div id="viewer-container">
+        <script type="text/javascript">
+            // JSmol initialization parameters
+            var Info = {
+                serverURL: null,           // No PHP server needed for online databases
+                use: "HTML5",
+                j2sPath: "j2s",
+                disableInitialConsole: true,
+                // Loads water directly from the PubChem repository on launch
+                script: "load :water; spin on; set antialiasDisplay true;"
+            };
 
-  <div id="viewer-container">
-    <script type="text/javascript">
-      // JSmol initialization parameters
-      var Info = {
-        serverURL: null,           // No PHP server needed for online databases
-        disableInitialConsole: true,
-        // Loads caffeine directly from the public NCI CACTVS server on launch
-        script: "load $caffeine; spin on; set antialiasDisplay true;"
-      };
+            // Create the JSmol object
+            var myJmol = Jmol.getApplet("myJmol", Info);
 
-      // Create the JSmol object
-      var myJmol = Jmol.getApplet("myJmol", Info);
-    </script>
-  </div>
+            // function for retrieving a molecule from an input box 
+            async function loadMolecule() {
+                var query = document.getElementById("compound-input").value.trim();
+                console.log(query);
+                const checkUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${query}/cids/JSON`;
 
-  <div class="controls">
-    <button onclick="Jmol.script(myJmol, 'spin on')">Spin On</button>
-    <button onclick="Jmol.script(myJmol, 'spin off')">Spin Off</button>
-    <button onclick="Jmol.script(myJmol, 'load $aspirin; spin on;')">Load Aspirin</button>
-    <button onclick="Jmol.script(myJmol, 'load $benzene; spin on;')">Load Benzene</button>
-  </div>
+                try {
+                    // 1. Lightweight pre-check
+                    const res = await fetch(checkUrl);
+
+                    if (!res.ok) {
+                        // 404 or other network error means the compound does not exist
+                        alert(`Compound "${query}" was not found in PubChem.`);
+                        return;
+                    }
+
+                    const data = await res.json();
+                    const cid = data.IdentifierList?.CID?.[0];
+
+                    if (!cid) {
+                        alert(`No valid structure found for "${query}".`);
+                        return;
+                    }
+
+                    // 2. Load directly into Jmol by PubChem CID (or use the original query)
+                    // In Jmol, ":" prefixes PubChem CIDs (e.g., "load :2244" for aspirin)
+                    const jmolScript = `load :${cid}; spin on; set antialiasDisplay true`;
+                    Jmol.script(myJmol, jmolScript);
+
+                } catch (err) {
+                    console.error("Network or validation error:", err);
+                    alert("Lookup failed. Check your internet connection.");
+                }
+            }
+
+
+        </script>
+    </div>
+
+    <br>
+    <p id="status-msg"></p>
+    <input type="text" id="compound-input" placeholder="e.g., caffeine, insulin, methane"
+        onkeypress="if(event.key === 'Enter') loadMolecule();">
+    <button onclick="loadMolecule()">Search</button>
+
+
+    <div class="controls">
+        <button onclick="Jmol.script(myJmol, 'spin on')">Spin On</button>
+        <button onclick="Jmol.script(myJmol, 'spin off')">Spin Off</button>
+        <button onclick="Jmol.script(myJmol, 'load $aspirin; spin on;')">Load Aspirin</button>
+        <button onclick="Jmol.script(myJmol, 'load $benzene; spin on;')">Load Benzene</button>
+    </div>
 
 </body>
+
 </html>
