@@ -10,6 +10,114 @@
 <body>
     <h1>Explore the features of website</h1>
     <a href="jsmol.html" style="color: white;">JSmol 3D Molecular Viewer</a>
+    <!-- Video Downloader Section -->
+<div style="margin-top: 40px; padding: 24px; background: #25252b; border-radius: 8px; display: inline-block; box-shadow: 0 4px 16px rgba(0,0,0,0.4); max-width: 520px; width: 100%; text-align: left; box-sizing: border-box;">
+  <h3 style="margin-top: 0; color: #f0f0f0;">Raspberry Pi Video Downloader</h3>
+  
+  <div style="display: flex; gap: 8px;">
+    <input 
+      type="text" 
+      id="video-url-input" 
+      placeholder="Paste Bilibili / YouTube / video URL..." 
+      style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #18181b; color: #fff; outline: none;"
+    />
+    <button 
+      id="dl-btn" 
+      onclick="triggerDownload()"
+      style="padding: 10px 18px; font-weight: bold; border: none; border-radius: 6px; background: #16a34a; color: white; cursor: pointer;">
+      Download
+    </button>
+  </div>
+  
+  <p id="dl-status" style="margin-top: 10px; font-size: 14px; color: #a1a1aa;"></p>
+
+  <hr style="border: 0; border-top: 1px solid #383842; margin: 18px 0;" />
+
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <h4 style="margin: 0; color: #e4e4e7;">Completed Downloads</h4>
+    <button onclick="fetchCompletedVideos()" style="background: none; border: 1px solid #555; color: #a1a1aa; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px;">Refresh</button>
+  </div>
+
+  <ul id="video-list" style="list-style: none; padding: 0; margin-top: 12px; max-height: 220px; overflow-y: auto;">
+    <li style="color: #71717a; font-size: 13px;">Loading completed files...</li>
+  </ul>
+</div>
+
+<script>
+  const API_BASE = "http://192.168.37.133:8000";
+
+  async function fetchCompletedVideos() {
+    const listEl = document.getElementById("video-list");
+    try {
+      const res = await fetch(`${API_BASE}/api/videos`);
+      const data = await res.json();
+
+      if (!data.videos || data.videos.length === 0) {
+        listEl.innerHTML = `<li style="color: #71717a; font-size: 13px;">No completed videos yet.</li>`;
+        return;
+      }
+
+      listEl.innerHTML = data.videos.map(v => `
+        <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #33333d;">
+          <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;" title="${v.filename}">
+            <span style="color: #e4e4e7; font-size: 14px;">${v.filename}</span><br/>
+            <span style="color: #71717a; font-size: 12px;">${v.size_mb} MB</span>
+          </div>
+          <a href="${v.download_url}" download style="background: #2563eb; color: #fff; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold;">
+            Save
+          </a>
+        </li>
+      `).join("");
+    } catch (err) {
+      listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">Failed to connect to Pi.</li>`;
+    }
+  }
+
+  async function triggerDownload() {
+    const input = document.getElementById("video-url-input");
+    const status = document.getElementById("dl-status");
+    const btn = document.getElementById("dl-btn");
+    const url = input.value.trim();
+
+    if (!url) {
+      status.innerText = "Please paste a video URL first.";
+      status.style.color = "#f87171";
+      return;
+    }
+
+    btn.disabled = true;
+    btn.style.opacity = "0.6";
+    status.innerText = "Submitting download task to Raspberry Pi...";
+    status.style.color = "#a1a1aa";
+
+    try {
+      const res = await fetch(`${API_BASE}/api/download`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        status.innerText = "Download queued on Pi! Click 'Refresh' once processing completes.";
+        status.style.color = "#4ade80";
+        input.value = "";
+      } else {
+        status.innerText = "Error: " + (data.message || "Failed to process task");
+        status.style.color = "#f87171";
+      }
+    } catch (err) {
+      status.innerText = "Connection failed. Ensure the Pi is online.";
+      status.style.color = "#f87171";
+    } finally {
+      btn.disabled = false;
+      btn.style.opacity = "1";
+    }
+  }
+
+  // Load files on page load
+  fetchCompletedVideos();
+</script>
 </body>
 
 </html>
