@@ -44,7 +44,8 @@
 </div>
 
 <script>
-  const API_BASE = "http://192.168.37.133:8000";
+  // Point to the secure Cloudflare tunnel URL
+  const API_BASE = "https://gender-fioricet-clinical-incidents.trycloudflare.com";
 
   async function fetchCompletedVideos() {
     const listEl = document.getElementById("video-list");
@@ -59,7 +60,7 @@
 
       listEl.innerHTML = data.videos.map(v => `
         <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #33333d;">
-          <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;" title="${v.filename}">
+          <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;" title="${v.filename}">
             <span style="color: #e4e4e7; font-size: 14px;">${v.filename}</span><br/>
             <span style="color: #71717a; font-size: 12px;">${v.size_mb} MB</span>
           </div>
@@ -115,7 +116,7 @@
     }
   }
 
-  // Load files on page load
+  // Load files when page loads
   fetchCompletedVideos();
 </script>
 </body>
