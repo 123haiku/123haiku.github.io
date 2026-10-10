@@ -58,6 +58,39 @@
     <script>
         const API_BASE = "https://animal-margin-chowder.ngrok-free.dev";
 
+        async function downloadFile(url, filename) {
+            try {
+                const res = await fetch(url, {
+                    headers: {
+                        "ngrok-skip-browser-warning": "true"
+                    }
+                });
+
+                if (!res.ok) throw new Error("Download request failed");
+
+                // Convert response stream to a binary Blob
+                const blob = await res.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+
+                // Trigger seamless browser download
+                const tempAnchor = document.createElement("a");
+                tempAnchor.href = blobUrl;
+                tempAnchor.download = filename;
+                document.body.appendChild(tempAnchor);
+                tempAnchor.click();
+
+                // Clean up temporary resources
+                document.body.removeChild(tempAnchor);
+                window.URL.revokeObjectURL(blobUrl);
+
+                // Refresh list to update deleted files
+                setTimeout(fetchCompletedVideos, 2000);
+            } catch (err) {
+                console.error("Failed to save video:", err);
+                alert("Failed to download video file from Raspberry Pi.");
+            }
+        }
+
         async function fetchCompletedVideos() {
             const listEl = document.getElementById("video-list");
             try {
@@ -74,18 +107,18 @@
                 }
 
                 listEl.innerHTML = data.videos.map(v => `
-        <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #33333d;">
-          <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;" title="${v.filename}">
-            <span style="color: #e4e4e7; font-size: 14px;">${v.filename}</span><br/>
-            <span style="color: #71717a; font-size: 12px;">${v.size_mb} MB (Deleted after saving)</span>
-          </div>
-          <a href="${v.download_url}" 
-             onclick="setTimeout(fetchCompletedVideos, 3000)"
-             style="background: #2563eb; color: #fff; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; cursor: pointer;">
-            Save
-          </a>
-        </li>
-      `).join("");
+      <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #33333d;">
+        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;" title="${v.filename}">
+          <span style="color: #e4e4e7; font-size: 14px;">${v.filename}</span><br/>
+          <span style="color: #71717a; font-size: 12px;">${v.size_mb} MB (Deleted after saving)</span>
+        </div>
+        <button 
+           onclick="downloadFile('${v.download_url}', '${v.filename}')"
+           style="background: #2563eb; color: #fff; padding: 6px 12px; border-radius: 4px; border: none; font-size: 12px; font-weight: bold; cursor: pointer;">
+          Save
+        </button>
+      </li>
+    `).join("");
             } catch (err) {
                 listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">Failed to connect to Pi.</li>`;
             }
