@@ -1,63 +1,79 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
     <script type="text/javascript" src="jsmol.min.js"></script>
-    <title>Welcome to 123Haiku's Website</title>    
+    <title>Welcome to 123Haiku's Website</title>
 </head>
+
 <body>
     <h1>Explore the features of website</h1>
     <a href="jsmol.html" style="color: white;">JSmol 3D Molecular Viewer</a><br>
     <!-- Video Downloader Section -->
-<div style="margin-top: 40px; padding: 24px; background: #25252b; border-radius: 8px; display: inline-block; box-shadow: 0 4px 16px rgba(0,0,0,0.4); max-width: 520px; width: 100%; text-align: left; box-sizing: border-box;">
-  <h3 style="margin-top: 0; color: #f0f0f0;">Online Video Downloader</h3>
-  
-  <div style="display: flex; gap: 8px;">
-    <input 
-      type="text" 
-      id="video-url-input" 
-      placeholder="Paste YouTube / Instagram / video URL..." 
-      style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #18181b; color: #fff; outline: none;"
-    />
-    <button 
-      id="dl-btn" 
-      onclick="triggerDownload()"
-      style="padding: 10px 18px; font-weight: bold; border: none; border-radius: 6px; background: #16a34a; color: white; cursor: pointer;">
-      Download
-    </button>
-  </div>
-  
-  <p id="dl-status" style="margin-top: 10px; font-size: 14px; color: #a1a1aa;"></p>
+    <div
+        style="margin-top: 40px; padding: 24px; background: #25252b; border-radius: 8px; display: inline-block; box-shadow: 0 4px 16px rgba(0,0,0,0.4); max-width: 520px; width: 100%; text-align: left; box-sizing: border-box;">
+        <h3 style="margin-top: 0; color: #f0f0f0;">Online Video Downloader</h3>
 
-  <hr style="border: 0; border-top: 1px solid #383842; margin: 18px 0;" />
+        <div style="display: flex; gap: 8px;">
+            <input type="text" id="video-url-input" placeholder="Paste YouTube / Instagram / video URL..."
+                style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #18181b; color: #fff; outline: none;" />
+            <button id="dl-btn" onclick="triggerDownload()"
+                style="padding: 10px 18px; font-weight: bold; border: none; border-radius: 6px; background: #16a34a; color: white; cursor: pointer;">
+                Download
+            </button>
+        </div>
 
-  <div style="display: flex; justify-content: space-between; align-items: center;">
-    <h4 style="margin: 0; color: #e4e4e7;">Completed Downloads</h4>
-    <button onclick="fetchCompletedVideos()" style="background: none; border: 1px solid #555; color: #a1a1aa; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px;">Refresh</button>
-  </div>
+        <div id="progress-container" style="display: none; margin-top: 14px;">
+            <div
+                style="display: flex; justify-content: space-between; font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">
+                <span id="progress-text">Downloading: 0%</span>
+                <span id="progress-meta">Speed: -- | ETA: --</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: #33333d; border-radius: 4px; overflow: hidden;">
+                <div id="progress-bar"
+                    style="width: 0%; height: 100%; background: #22c55e; transition: width 0.3s ease;"></div>
+            </div>
+        </div>
+        <p id="dl-status" style="margin-top: 10px; font-size: 14px; color: #a1a1aa;"></p>
 
-  <ul id="video-list" style="list-style: none; padding: 0; margin-top: 12px; max-height: 220px; overflow-y: auto;">
-    <li style="color: #71717a; font-size: 13px;">Loading completed files...</li>
-  </ul>
-</div>
 
-<script>
-  const API_BASE = "animal-margin-chowder.ngrok-free.dev";
 
-  async function fetchCompletedVideos() {
-    const listEl = document.getElementById("video-list");
-    try {
-      const res = await fetch(`${API_BASE}/api/videos`);
-      const data = await res.json();
+        <hr style="border: 0; border-top: 1px solid #383842; margin: 18px 0;" />
 
-      if (!data.videos || data.videos.length === 0) {
-        listEl.innerHTML = `<li style="color: #71717a; font-size: 13px;">No completed videos available.</li>`;
-        return;
-      }
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; color: #e4e4e7;">Completed Downloads</h4>
+            <button onclick="fetchCompletedVideos()"
+                style="background: none; border: 1px solid #555; color: #a1a1aa; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px;">Refresh</button>
+        </div>
 
-      listEl.innerHTML = data.videos.map(v => `
+        <ul id="video-list"
+            style="list-style: none; padding: 0; margin-top: 12px; max-height: 220px; overflow-y: auto;">
+            <li style="color: #71717a; font-size: 13px;">Loading completed files...</li>
+        </ul>
+    </div>
+
+    <script>
+        const API_BASE = "https://animal-margin-chowder.ngrok-free.dev";
+
+        async function fetchCompletedVideos() {
+            const listEl = document.getElementById("video-list");
+            try {
+                const res = await fetch(`${API_BASE}/api/videos`, {
+                    headers: {
+                        "ngrok-skip-browser-warning": "true"
+                    }
+                });
+                const data = await res.json();
+
+                if (!data.videos || data.videos.length === 0) {
+                    listEl.innerHTML = `<li style="color: #71717a; font-size: 13px;">No completed videos available.</li>`;
+                    return;
+                }
+
+                listEl.innerHTML = data.videos.map(v => `
         <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #33333d;">
           <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;" title="${v.filename}">
             <span style="color: #e4e4e7; font-size: 14px;">${v.filename}</span><br/>
@@ -70,55 +86,102 @@
           </a>
         </li>
       `).join("");
-    } catch (err) {
-      listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">Failed to connect to Pi.</li>`;
-    }
-  }
+            } catch (err) {
+                listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">Failed to connect to Pi.</li>`;
+            }
+        }
 
-  async function triggerDownload() {
-    const input = document.getElementById("video-url-input");
-    const status = document.getElementById("dl-status");
-    const btn = document.getElementById("dl-btn");
-    const url = input.value.trim();
+        async function pollProgress(taskId) {
+            const container = document.getElementById("progress-container");
+            const bar = document.getElementById("progress-bar");
+            const text = document.getElementById("progress-text");
+            const meta = document.getElementById("progress-meta");
+            const status = document.getElementById("dl-status");
 
-    if (!url) {
-      status.innerText = "Please paste a video URL first.";
-      status.style.color = "#f87171";
-      return;
-    }
+            container.style.display = "block";
 
-    btn.disabled = true;
-    btn.style.opacity = "0.6";
-    status.innerText = "Submitting download task to Raspberry Pi...";
-    status.style.color = "#a1a1aa";
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/api/progress/${taskId}`, {
+                        headers: { "ngrok-skip-browser-warning": "true" }
+                    });
+                    if (!res.ok) return;
 
-    try {
-      const res = await fetch(`${API_BASE}/api/download`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url })
-      });
+                    const data = await res.json();
 
-      const data = await res.json();
-      if (res.ok) {
-        status.innerText = "Download queued on Pi! Click 'Refresh' once processing completes.";
-        status.style.color = "#4ade80";
-        input.value = "";
-      } else {
-        status.innerText = "Error: " + (data.message || "Failed to process task");
-        status.style.color = "#f87171";
-      }
-    } catch (err) {
-      status.innerText = "Connection failed. Ensure the Pi is online.";
-      status.style.color = "#f87171";
-    } finally {
-      btn.disabled = false;
-      btn.style.opacity = "1";
-    }
-  }
+                    if (data.status === "downloading") {
+                        bar.style.width = `${data.percent}%`;
+                        text.innerText = `Downloading: ${data.percent}%`;
+                        meta.innerText = `${data.speed} | ETA: ${data.eta}`;
+                    } else if (data.status === "processing") {
+                        bar.style.width = "100%";
+                        text.innerText = "Processing & Muxing audio/video...";
+                        meta.innerText = "Almost done";
+                    } else if (data.status === "completed") {
+                        clearInterval(interval);
+                        bar.style.width = "100%";
+                        text.innerText = "Finished!";
+                        meta.innerText = "";
+                        status.innerText = "Download complete! Ready in the list below.";
+                        status.style.color = "#4ade80";
+                        fetchCompletedVideos();
+                    } else if (data.status === "error") {
+                        clearInterval(interval);
+                        status.innerText = "Download failed on Pi.";
+                        status.style.color = "#ef4444";
+                    }
+                } catch (e) {
+                    console.error("Polling error", e);
+                }
+            }, 1000); // Check every second
+        }
 
-  fetchCompletedVideos();
-</script>
+        async function triggerDownload() {
+            const input = document.getElementById("video-url-input");
+            const status = document.getElementById("dl-status");
+            const btn = document.getElementById("dl-btn");
+            const url = input.value.trim();
+
+            if (!url) {
+                status.innerText = "Please paste a video URL first.";
+                status.style.color = "#f87171";
+                return;
+            }
+
+            btn.disabled = true;
+            btn.style.opacity = "0.6";
+            status.innerText = "Submitting download task...";
+            status.style.color = "#a1a1aa";
+
+            try {
+                const res = await fetch(`${API_BASE}/api/download`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "ngrok-skip-browser-warning": "true"
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.task_id) {
+                    input.value = "";
+                    pollProgress(data.task_id);
+                } else {
+                    status.innerText = "Error: " + (data.message || "Failed to start download");
+                    status.style.color = "#f87171";
+                }
+            } catch (err) {
+                status.innerText = "Connection failed. Ensure the Pi is online.";
+                status.style.color = "#f87171";
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            }
+        }
+
+        fetchCompletedVideos();
+    </script>
 </body>
 
 </html>
