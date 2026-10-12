@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,13 +7,12 @@
     <script type="text/javascript" src="jsmol.min.js"></script>
     <title>Welcome to 123Haiku's Website</title>
 </head>
-
 <body>
     <h1>Explore the features of website</h1>
     <a href="jsmol.html" style="color: white;">JSmol 3D Molecular Viewer</a><br>
+
     <!-- Video Downloader Section -->
-    <div
-        style="margin-top: 40px; padding: 24px; background: #25252b; border-radius: 8px; display: inline-block; box-shadow: 0 4px 16px rgba(0,0,0,0.4); max-width: 520px; width: 100%; text-align: left; box-sizing: border-box;">
+    <div style="margin-top: 40px; padding: 24px; background: #25252b; border-radius: 8px; display: inline-block; box-shadow: 0 4px 16px rgba(0,0,0,0.4); max-width: 520px; width: 100%; text-align: left; box-sizing: border-box;">
         <h3 style="margin-top: 0; color: #f0f0f0;">Online Video Downloader</h3>
 
         <div style="display: flex; gap: 8px;">
@@ -27,19 +25,15 @@
         </div>
 
         <div id="progress-container" style="display: none; margin-top: 14px;">
-            <div
-                style="display: flex; justify-content: space-between; font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; color: #a1a1aa; margin-bottom: 4px;">
                 <span id="progress-text">Downloading: 0%</span>
                 <span id="progress-meta">Speed: -- | ETA: --</span>
             </div>
             <div style="width: 100%; height: 8px; background: #33333d; border-radius: 4px; overflow: hidden;">
-                <div id="progress-bar"
-                    style="width: 0%; height: 100%; background: #22c55e; transition: width 0.3s ease;"></div>
+                <div id="progress-bar" style="width: 0%; height: 100%; background: #22c55e; transition: width 0.3s ease;"></div>
             </div>
         </div>
         <p id="dl-status" style="margin-top: 10px; font-size: 14px; color: #a1a1aa;"></p>
-
-
 
         <hr style="border: 0; border-top: 1px solid #383842; margin: 18px 0;" />
 
@@ -49,78 +43,128 @@
                 style="background: none; border: 1px solid #555; color: #a1a1aa; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px;">Refresh</button>
         </div>
 
-        <ul id="video-list"
-            style="list-style: none; padding: 0; margin-top: 12px; max-height: 220px; overflow-y: auto;">
+        <ul id="video-list" style="list-style: none; padding: 0; margin-top: 12px; max-height: 220px; overflow-y: auto;">
             <li style="color: #71717a; font-size: 13px;">Loading completed files...</li>
         </ul>
+
+        <!-- Raspberry Pi Stats Panel -->
+        <hr style="border: 0; border-top: 1px solid #383842; margin: 18px 0;" />
+        <div style="font-size: 13px; color: #a1a1aa;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <strong style="color: #e4e4e7;">Raspberry Pi Health</strong>
+                <span id="pi-online-status" style="color: #ef4444;">● Offline</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>CPU Temp: <span id="stat-temp" style="color: #fff;">--</span></div>
+                <div>CPU Usage: <span id="stat-cpu" style="color: #fff;">--</span></div>
+                <div>RAM: <span id="stat-ram" style="color: #fff;">--</span></div>
+                <div>Disk Free: <span id="stat-disk" style="color: #fff;">--</span></div>
+            </div>
+        </div>
     </div>
 
     <script>
         const API_BASE = "https://animal-margin-chowder.ngrok-free.dev";
 
-        async function downloadFile(url, filename) {
-            try {
-                const res = await fetch(url, {
-                    headers: {
-                        "ngrok-skip-browser-warning": "true"
-                    }
-                });
-
-                if (!res.ok) throw new Error("Download request failed");
-
-                // Convert response stream to a binary Blob
-                const blob = await res.blob();
-                const blobUrl = window.URL.createObjectURL(blob);
-
-                // Trigger seamless browser download
-                const tempAnchor = document.createElement("a");
-                tempAnchor.href = blobUrl;
-                tempAnchor.download = filename;
-                document.body.appendChild(tempAnchor);
-                tempAnchor.click();
-
-                // Clean up temporary resources
-                document.body.removeChild(tempAnchor);
-                window.URL.revokeObjectURL(blobUrl);
-
-                // Refresh list to update deleted files
-                setTimeout(fetchCompletedVideos, 2000);
-            } catch (err) {
-                console.error("Failed to save video:", err);
-                alert("Failed to download video file from Raspberry Pi.");
+        // Retrieve or prompt for API key
+        function getApiKey() {
+            let key = localStorage.getItem("pi_api_key");
+            if (!key) {
+                key = prompt("Enter your Raspberry Pi Access Key:");
+                if (key) localStorage.setItem("pi_api_key", key);
             }
+            return key || "";
+        }
+
+        function getAuthHeaders(extraHeaders = {}) {
+            return {
+                "ngrok-skip-browser-warning": "true",
+                "X-API-Key": getApiKey(),
+                ...extraHeaders
+            };
+        }
+
+        // Safe DOM Node Creation (Neutralizes XSS)
+        function createVideoListItem(v) {
+            const li = document.createElement("li");
+            li.style.cssText = "display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #33333d;";
+
+            const infoDiv = document.createElement("div");
+            infoDiv.style.cssText = "overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;";
+            infoDiv.title = v.filename;
+
+            const nameSpan = document.createElement("span");
+            nameSpan.style.cssText = "color: #e4e4e7; font-size: 14px;";
+            nameSpan.textContent = v.filename;
+
+            const sizeSpan = document.createElement("span");
+            sizeSpan.style.cssText = "color: #71717a; font-size: 12px;";
+            sizeSpan.textContent = `${v.size_mb} MB (Deleted after saving)`;
+
+            infoDiv.appendChild(nameSpan);
+            infoDiv.appendChild(document.createElement("br"));
+            infoDiv.appendChild(sizeSpan);
+
+            const saveBtn = document.createElement("button");
+            saveBtn.textContent = "Save";
+            saveBtn.style.cssText = "background: #2563eb; color: #fff; padding: 6px 12px; border-radius: 4px; border: none; font-size: 12px; font-weight: bold; cursor: pointer;";
+            saveBtn.addEventListener("click", () => downloadFile(v.download_url, v.filename));
+
+            li.appendChild(infoDiv);
+            li.appendChild(saveBtn);
+            return li;
         }
 
         async function fetchCompletedVideos() {
             const listEl = document.getElementById("video-list");
             try {
-                const res = await fetch(`${API_BASE}/api/videos`, {
-                    headers: {
-                        "ngrok-skip-browser-warning": "true"
-                    }
+                const res = await fetch(`${API_BASE}/api/videos?t=${Date.now()}`, {
+                    headers: getAuthHeaders()
                 });
+                
+                if (res.status === 401) {
+                    localStorage.removeItem("pi_api_key");
+                    listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">Unauthorized: Invalid API key. Refresh to re-enter.</li>`;
+                    return;
+                }
+
                 const data = await res.json();
+                listEl.innerHTML = "";
 
                 if (!data.videos || data.videos.length === 0) {
                     listEl.innerHTML = `<li style="color: #71717a; font-size: 13px;">No completed videos available.</li>`;
                     return;
                 }
 
-                listEl.innerHTML = data.videos.map(v => `
-      <li style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #33333d;">
-        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;" title="${v.filename}">
-          <span style="color: #e4e4e7; font-size: 14px;">${v.filename}</span><br/>
-          <span style="color: #71717a; font-size: 12px;">${v.size_mb} MB (Deleted after saving)</span>
-        </div>
-        <button 
-           onclick="downloadFile('${v.download_url}', '${v.filename}')"
-           style="background: #2563eb; color: #fff; padding: 6px 12px; border-radius: 4px; border: none; font-size: 12px; font-weight: bold; cursor: pointer;">
-          Save
-        </button>
-      </li>
-    `).join("");
+                data.videos.forEach(v => listEl.appendChild(createVideoListItem(v)));
             } catch (err) {
                 listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">Failed to connect to Pi.</li>`;
+            }
+        }
+
+        async function downloadFile(url, filename) {
+            try {
+                const res = await fetch(url, {
+                    headers: getAuthHeaders()
+                });
+
+                if (!res.ok) throw new Error("Download request failed");
+
+                const blob = await res.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+
+                const tempAnchor = document.createElement("a");
+                tempAnchor.href = blobUrl;
+                tempAnchor.download = filename;
+                document.body.appendChild(tempAnchor);
+                tempAnchor.click();
+
+                document.body.removeChild(tempAnchor);
+                window.URL.revokeObjectURL(blobUrl);
+
+                setTimeout(fetchCompletedVideos, 1000);
+            } catch (err) {
+                alert("Failed to download video file from Raspberry Pi.");
             }
         }
 
@@ -136,7 +180,7 @@
             const interval = setInterval(async () => {
                 try {
                     const res = await fetch(`${API_BASE}/api/progress/${taskId}`, {
-                        headers: { "ngrok-skip-browser-warning": "true" }
+                        headers: getAuthHeaders()
                     });
                     if (!res.ok) return;
 
@@ -160,13 +204,13 @@
                         fetchCompletedVideos();
                     } else if (data.status === "error") {
                         clearInterval(interval);
-                        status.innerText = "Download failed on Pi.";
+                        status.innerText = "Download failed: " + (data.error || "Unknown error");
                         status.style.color = "#ef4444";
                     }
                 } catch (e) {
                     console.error("Polling error", e);
                 }
-            }, 1000); // Check every second
+            }, 1000);
         }
 
         async function triggerDownload() {
@@ -189,10 +233,7 @@
             try {
                 const res = await fetch(`${API_BASE}/api/download`, {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "ngrok-skip-browser-warning": "true"
-                    },
+                    headers: getAuthHeaders({ "Content-Type": "application/json" }),
                     body: JSON.stringify({ url: url })
                 });
 
@@ -201,7 +242,7 @@
                     input.value = "";
                     pollProgress(data.task_id);
                 } else {
-                    status.innerText = "Error: " + (data.message || "Failed to start download");
+                    status.innerText = "Error: " + (data.detail || data.message || "Failed to start download");
                     status.style.color = "#f87171";
                 }
             } catch (err) {
@@ -213,8 +254,37 @@
             }
         }
 
+        async function fetchPiStats() {
+            const statusEl = document.getElementById("pi-online-status");
+            const tempEl = document.getElementById("stat-temp");
+            const cpuEl = document.getElementById("stat-cpu");
+            const ramEl = document.getElementById("stat-ram");
+            const diskEl = document.getElementById("stat-disk");
+
+            try {
+                const res = await fetch(`${API_BASE}/api/stats`, {
+                    headers: getAuthHeaders()
+                });
+                if (!res.ok) throw new Error("Stats request rejected");
+
+                const data = await res.json();
+                statusEl.innerText = "● Online";
+                statusEl.style.color = "#22c55e";
+
+                tempEl.innerText = data.cpu_temp_c ? `${data.cpu_temp_c}°C` : "N/A";
+                cpuEl.innerText = `${data.cpu_usage_pct}%`;
+                ramEl.innerText = `${data.ram_used_mb}MB / ${data.ram_total_mb}MB (${data.ram_pct}%)`;
+                diskEl.innerText = `${data.disk_free_gb}GB free / ${data.disk_total_gb}GB`;
+            } catch (err) {
+                statusEl.innerText = "● Offline";
+                statusEl.style.color = "#ef4444";
+            }
+        }
+
+        // Initialize UI
         fetchCompletedVideos();
+        fetchPiStats();
+        setInterval(fetchPiStats, 5000);
     </script>
 </body>
-
 </html>
