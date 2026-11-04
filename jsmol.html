@@ -119,18 +119,18 @@
             <button class="ctrl-btn" onclick="loadPreset('Benzene', 'load $benzene; spin on;')">Benzene</button>
             <button class="ctrl-btn" onclick="loadPreset('Ethanol', 'load $ethanol; spin on;')">Ethanol</button>
             <button class="ctrl-btn" onclick="loadPreset('Water', 'load :water; spin on;')">Water</button>
-            <button class="ctrl-btn" onclick="loadPreset('Glucose', 'load $glucose; spin on;')">Glucose</button>
+            <button class="ctrl-btn" onclick="loadPreset('Crambin Protein', 'load =1crn; cartoon only; color structure; spin on;')">Crambin (Protein)</button>
         </div>
 
         <hr class="divider">
 
         <!-- Structure Style -->
-        <div class="section-title">Structure Style</div>
+        <div class="section-title">Display Style</div>
         <div class="btn-grid">
-            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'wireframe 0.15; spacefill 23%;')">Ball &amp; Stick</button>
-            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'spacefill only;')">Spacefill</button>
-            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'wireframe only;')">Wireframe</button>
-            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'cartoon only; color structure;')">Cartoons</button>
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'select all; cartoon off; wireframe 0.15; spacefill 23%;')">Ball &amp; Stick</button>
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'select all; cartoon off; wireframe off; spacefill 100%;')">Spacefill</button>
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'select all; cartoon off; spacefill off; wireframe 0.08;')">Wireframe</button>
+            <button class="ctrl-btn" title="Only for proteins/PDB models" onclick="Jmol.script(myJmol, 'select all; wireframe off; spacefill off; cartoon only; color structure;')">Cartoons (Proteins)</button>
         </div>
 
         <hr class="divider">
@@ -138,9 +138,10 @@
         <!-- Coloring & Surfaces -->
         <div class="section-title">Coloring &amp; Surface</div>
         <div class="btn-grid">
-            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'color cpk;')">CPK Elements</button>
-            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'color structure;')">Secondary Structure</button>
-            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'isosurface vdw map mep; color isosurface translucent 0.4;')">MEP Surface</button>
+            <button class="ctrl-btn" title="Standard element colors (Carbon gray, Oxygen red, Nitrogen blue)" onclick="Jmol.script(myJmol, 'select all; color cpk; color bonds cpk;')">CPK Elements</button>
+            <button class="ctrl-btn" title="Color by partial charge / polarity (Red: negative, Blue: positive)" onclick="Jmol.script(myJmol, 'calculate partialcharge; select all; color partialcharge;')">Polarity / Charge</button>
+            <button class="ctrl-btn" title="Clean monochrome representation" onclick="Jmol.script(myJmol, 'select all; color atoms cyan; color bonds gray;')">Cyan Monochrome</button>
+            <button class="ctrl-btn" title="Molecular Electrostatic Potential surface" onclick="Jmol.script(myJmol, 'calculate partialcharge; isosurface vdw map mep; color isosurface translucent 0.4;')">MEP Surface</button>
             <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'isosurface off;')">Surface Off</button>
         </div>
 
