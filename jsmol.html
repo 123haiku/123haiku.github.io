@@ -20,11 +20,11 @@
     <div id="viewer-container">
         <script type="text/javascript">
             var Info = {
-                serverURL: null,
+                serverURL: "https://chemapps.stolaf.edu/jmol/jsmol/php/jsmol.php",
                 use: "HTML5",
                 j2sPath: "j2s",
                 disableInitialConsole: true,
-                script: "load :water; spin on; set antialiasDisplay true;"
+                script: "set loadFormat 'https://files.rcsb.org/download/%FILE.pdb'; load :water; spin on; set antialiasDisplay true;"
             };
 
             var myJmol = Jmol.getApplet("myJmol", Info);
@@ -34,6 +34,27 @@
                 var query = document.getElementById("compound-input").value.trim();
                 var statusEl = document.getElementById("status-msg");
                 if (!query) return;
+
+                // If user typed a 4-character PDB code (e.g., 1CRN, 1HHO)
+                if (/^[0-9][a-zA-Z0-9]{3}$/i.test(query)) {
+                    var pdbCode = query.toUpperCase();
+                    statusEl.innerText = `Fetching PDB entry "${pdbCode}" from RCSB...`;
+                    statusEl.style.color = "#93c5fd";
+                    var directPdb = `https://files.rcsb.org/download/${pdbCode}.pdb`;
+                    try {
+                        var checkRes = await fetch(directPdb, { method: "HEAD" });
+                        if (checkRes.ok) {
+                            Jmol.script(myJmol, `load ${directPdb}; select all; cartoon only; color structure; spin on; set antialiasDisplay true;`);
+                            isSpinning = true;
+                            updateSpinButton();
+                            statusEl.innerText = `Loaded PDB protein: ${pdbCode}`;
+                            statusEl.style.color = "#4ade80";
+                            return;
+                        }
+                    } catch (e) {
+                        // Fall back to PubChem search
+                    }
+                }
 
                 statusEl.innerText = `Searching PubChem for "${query}"...`;
                 statusEl.style.color = "#93c5fd";
@@ -57,7 +78,7 @@
                         return;
                     }
 
-                    const jmolScript = `load :${cid}; spin on; set antialiasDisplay true`;
+                    const jmolScript = `load :${cid}; select all; wireframe 0.15; spacefill 23%; color cpk; spin on; set antialiasDisplay true;`;
                     Jmol.script(myJmol, jmolScript);
                     isSpinning = true;
                     updateSpinButton();
@@ -105,7 +126,7 @@
         <!-- Search Bar -->
         <div class="search-container">
             <input type="text" id="compound-input" class="search-input"
-                placeholder="Search PubChem (e.g. caffeine, aspirin, glucose, ethanol)..."
+                placeholder="Search PubChem (e.g. caffeine, glucose) or PDB ID (e.g. 1crn, 1hho)..."
                 onkeypress="if(event.key === 'Enter') loadMolecule();">
             <button class="search-btn" onclick="loadMolecule()">Search</button>
         </div>
@@ -114,12 +135,12 @@
         <!-- Presets -->
         <div class="section-title">Presets</div>
         <div class="btn-grid">
-            <button class="ctrl-btn" onclick="loadPreset('Aspirin', 'load $aspirin; spin on;')">Aspirin</button>
-            <button class="ctrl-btn" onclick="loadPreset('Caffeine', 'load $caffeine; spin on;')">Caffeine</button>
-            <button class="ctrl-btn" onclick="loadPreset('Benzene', 'load $benzene; spin on;')">Benzene</button>
-            <button class="ctrl-btn" onclick="loadPreset('Ethanol', 'load $ethanol; spin on;')">Ethanol</button>
-            <button class="ctrl-btn" onclick="loadPreset('Water', 'load :water; spin on;')">Water</button>
-            <button class="ctrl-btn" onclick="loadPreset('Crambin Protein', 'load =1crn; cartoon only; color structure; spin on;')">Crambin (Protein)</button>
+            <button class="ctrl-btn" onclick="loadPreset('Aspirin', 'load $aspirin; select all; wireframe 0.15; spacefill 23%; color cpk; spin on;')">Aspirin</button>
+            <button class="ctrl-btn" onclick="loadPreset('Caffeine', 'load $caffeine; select all; wireframe 0.15; spacefill 23%; color cpk; spin on;')">Caffeine</button>
+            <button class="ctrl-btn" onclick="loadPreset('Benzene', 'load $benzene; select all; wireframe 0.15; spacefill 23%; color cpk; spin on;')">Benzene</button>
+            <button class="ctrl-btn" onclick="loadPreset('Ethanol', 'load $ethanol; select all; wireframe 0.15; spacefill 23%; color cpk; spin on;')">Ethanol</button>
+            <button class="ctrl-btn" onclick="loadPreset('Water', 'load :water; select all; wireframe 0.15; spacefill 23%; color cpk; spin on;')">Water</button>
+            <button class="ctrl-btn" onclick="loadPreset('Crambin (Protein)', 'load https://files.rcsb.org/download/1CRN.pdb; select all; cartoon only; color structure; spin on;')">Crambin (Protein)</button>
         </div>
 
         <hr class="divider">
