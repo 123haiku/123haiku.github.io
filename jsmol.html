@@ -1,44 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="utf-8">
-    <title>JSmol Test Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSmol 3D Molecular Viewer</title>
     <link rel="stylesheet" href="style.css">
     <script type="text/javascript" src="JSmol.min.js"></script>
 </head>
 
 <body>
 
-    <h2>JSmol 3D Molecular Viewer</h2>
+    <div style="max-width: 680px; margin: 0 auto; padding: 0 16px; text-align: left;">
+        <a href="index.html" class="back-link">← Back to Main Page</a>
+    </div>
+
+    <h2 style="margin: 16px 0 20px; color: #f0f0f0;">JSmol 3D Molecular Viewer</h2>
+
     <div id="viewer-container">
         <script type="text/javascript">
-            // JSmol initialization parameters
             var Info = {
-                serverURL: null,           // No PHP server needed for online databases
+                serverURL: null,
                 use: "HTML5",
                 j2sPath: "j2s",
                 disableInitialConsole: true,
-                // Loads water directly from the PubChem repository on launch
                 script: "load :water; spin on; set antialiasDisplay true;"
             };
 
-            // Create the JSmol object
             var myJmol = Jmol.getApplet("myJmol", Info);
+            var isSpinning = true;
 
-            // function for retrieving a molecule from an input box 
             async function loadMolecule() {
                 var query = document.getElementById("compound-input").value.trim();
-                console.log(query);
-                const checkUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${query}/cids/JSON`;
+                var statusEl = document.getElementById("status-msg");
+                if (!query) return;
+
+                statusEl.innerText = `Searching PubChem for "${query}"...`;
+                statusEl.style.color = "#93c5fd";
+
+                const checkUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(query)}/cids/JSON`;
 
                 try {
-                    // 1. Lightweight pre-check
                     const res = await fetch(checkUrl);
-
                     if (!res.ok) {
-                        // 404 or other network error means the compound does not exist
-                        alert(`Compound "${query}" was not found in PubChem.`);
+                        statusEl.innerText = `Compound "${query}" was not found in PubChem.`;
+                        statusEl.style.color = "#f87171";
                         return;
                     }
 
@@ -46,52 +52,106 @@
                     const cid = data.IdentifierList?.CID?.[0];
 
                     if (!cid) {
-                        alert(`No valid structure found for "${query}".`);
+                        statusEl.innerText = `No valid structure found for "${query}".`;
+                        statusEl.style.color = "#f87171";
                         return;
                     }
 
-                    // 2. Load directly into Jmol by PubChem CID (or use the original query)
-                    // In Jmol, ":" prefixes PubChem CIDs (e.g., "load :2244" for aspirin)
                     const jmolScript = `load :${cid}; spin on; set antialiasDisplay true`;
                     Jmol.script(myJmol, jmolScript);
+                    isSpinning = true;
+                    updateSpinButton();
 
+                    statusEl.innerText = `Loaded: ${query} (CID: ${cid})`;
+                    statusEl.style.color = "#4ade80";
                 } catch (err) {
-                    console.error("Network or validation error:", err);
-                    alert("Lookup failed. Check your internet connection.");
+                    statusEl.innerText = "Lookup failed. Check internet connection.";
+                    statusEl.style.color = "#f87171";
                 }
             }
 
+            function loadPreset(name, script) {
+                var statusEl = document.getElementById("status-msg");
+                statusEl.innerText = `Loaded preset: ${name}`;
+                statusEl.style.color = "#4ade80";
+                Jmol.script(myJmol, script);
+                isSpinning = true;
+                updateSpinButton();
+            }
 
+            function toggleSpin() {
+                isSpinning = !isSpinning;
+                Jmol.script(myJmol, isSpinning ? "spin on;" : "spin off;");
+                updateSpinButton();
+            }
+
+            function updateSpinButton() {
+                var btn = document.getElementById("spin-btn");
+                if (btn) {
+                    if (isSpinning) {
+                        btn.innerHTML = "⏸ Pause Spin";
+                        btn.classList.add("active");
+                    } else {
+                        btn.innerHTML = "▶ Resume Spin";
+                        btn.classList.remove("active");
+                    }
+                }
+            }
         </script>
     </div>
 
-    <br>
-    <p id="status-msg"></p>
-    <input type="text" id="compound-input" placeholder="e.g., caffeine, insulin, methane"
-        onkeypress="if(event.key === 'Enter') loadMolecule();">
-    <button onclick="loadMolecule()">Search</button>
+    <!-- Controls Panel Card -->
+    <div class="control-card">
+        <!-- Search Bar -->
+        <div class="search-container">
+            <input type="text" id="compound-input" class="search-input"
+                placeholder="Search PubChem (e.g. caffeine, aspirin, glucose, ethanol)..."
+                onkeypress="if(event.key === 'Enter') loadMolecule();">
+            <button class="search-btn" onclick="loadMolecule()">Search</button>
+        </div>
+        <p id="status-msg" class="status-text"></p>
 
+        <!-- Presets -->
+        <div class="section-title">Presets</div>
+        <div class="btn-grid">
+            <button class="ctrl-btn" onclick="loadPreset('Aspirin', 'load $aspirin; spin on;')">Aspirin</button>
+            <button class="ctrl-btn" onclick="loadPreset('Caffeine', 'load $caffeine; spin on;')">Caffeine</button>
+            <button class="ctrl-btn" onclick="loadPreset('Benzene', 'load $benzene; spin on;')">Benzene</button>
+            <button class="ctrl-btn" onclick="loadPreset('Ethanol', 'load $ethanol; spin on;')">Ethanol</button>
+            <button class="ctrl-btn" onclick="loadPreset('Water', 'load :water; spin on;')">Water</button>
+            <button class="ctrl-btn" onclick="loadPreset('Glucose', 'load $glucose; spin on;')">Glucose</button>
+        </div>
 
-    <div class="controls">
-<button onclick="Jmol.script(myJmol, 'if (_spinning) { spin off; } else { spin on; }')">
-  Toggle Spin</button>        
-<button onclick="Jmol.script(myJmol, 'load $aspirin; spin on;')">Load Aspirin</button>
-        <button onclick="Jmol.script(myJmol, 'load $benzene; spin on;')">Load Benzene</button>
-        <button onclick="Jmol.script(myJmol, 'spacefill only;')">Spacefill</button>
-<button onclick="Jmol.script(myJmol, 'wireframe 0.15; spacefill 23%;')">Ball & Stick</button>
-<button onclick="Jmol.script(myJmol, 'cartoon only; color structure;')">Cartoons</button>
+        <hr class="divider">
 
-<!-- Coloring -->
-<button onclick="Jmol.script(myJmol, 'color cpk;')">CPK</button>
-<button onclick="Jmol.script(myJmol, 'color structure;')">Structure</button>
+        <!-- Structure Style -->
+        <div class="section-title">Structure Style</div>
+        <div class="btn-grid">
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'wireframe 0.15; spacefill 23%;')">Ball &amp; Stick</button>
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'spacefill only;')">Spacefill</button>
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'wireframe only;')">Wireframe</button>
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'cartoon only; color structure;')">Cartoons</button>
+        </div>
 
-<!-- Surfaces -->
-<button onclick="Jmol.script(myJmol, 'isosurface vdw map mep; color isosurface translucent 0.4;')">MEP Surface</button>
-<button onclick="Jmol.script(myJmol, 'isosurface off;')">Surface Off</button>
+        <hr class="divider">
 
-<!-- Spin -->
-<button onclick="Jmol.script(myJmol, 'spin on;')">Spin On</button>
-<button onclick="Jmol.script(myJmol, 'spin off;')">Spin Off</button>
+        <!-- Coloring & Surfaces -->
+        <div class="section-title">Coloring &amp; Surface</div>
+        <div class="btn-grid">
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'color cpk;')">CPK Elements</button>
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'color structure;')">Secondary Structure</button>
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'isosurface vdw map mep; color isosurface translucent 0.4;')">MEP Surface</button>
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'isosurface off;')">Surface Off</button>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Motion & Camera -->
+        <div class="section-title">Motion &amp; Camera</div>
+        <div class="btn-grid">
+            <button id="spin-btn" class="ctrl-btn active" onclick="toggleSpin()">⏸ Pause Spin</button>
+            <button class="ctrl-btn" onclick="Jmol.script(myJmol, 'reset; center;')">⌖ Reset Camera</button>
+        </div>
     </div>
 
 </body>
