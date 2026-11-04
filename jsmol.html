@@ -73,10 +73,25 @@
 
 
     <div class="controls">
-        <button onclick="Jmol.script(myJmol, 'spin on')">Spin On</button>
-        <button onclick="Jmol.script(myJmol, 'spin off')">Spin Off</button>
-        <button onclick="Jmol.script(myJmol, 'load $aspirin; spin on;')">Load Aspirin</button>
+<button onclick="Jmol.script(myJmol, 'if (_spinning) { spin off; } else { spin on; }')">
+  Toggle Spin</button>        
+<button onclick="Jmol.script(myJmol, 'load $aspirin; spin on;')">Load Aspirin</button>
         <button onclick="Jmol.script(myJmol, 'load $benzene; spin on;')">Load Benzene</button>
+        <button onclick="Jmol.script(myJmol, 'spacefill only;')">Spacefill</button>
+<button onclick="Jmol.script(myJmol, 'wireframe 0.15; spacefill 23%;')">Ball & Stick</button>
+<button onclick="Jmol.script(myJmol, 'cartoon only; color structure;')">Cartoons</button>
+
+<!-- Coloring -->
+<button onclick="Jmol.script(myJmol, 'color cpk;')">CPK</button>
+<button onclick="Jmol.script(myJmol, 'color structure;')">Structure</button>
+
+<!-- Surfaces -->
+<button onclick="Jmol.script(myJmol, 'isosurface vdw map mep; color isosurface translucent 0.4;')">MEP Surface</button>
+<button onclick="Jmol.script(myJmol, 'isosurface off;')">Surface Off</button>
+
+<!-- Spin -->
+<button onclick="Jmol.script(myJmol, 'spin on;')">Spin On</button>
+<button onclick="Jmol.script(myJmol, 'spin off;')">Spin Off</button>
     </div>
 
 </body>

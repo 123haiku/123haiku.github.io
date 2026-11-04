@@ -64,7 +64,7 @@
     </div>
 
     <script>
-        const API_BASE = "https://animal-margin-chowder.ngrok-free.dev";
+        const API_BASE = "https://api.ngc6543.tech";
 
         function getApiKey() {
             let key = localStorage.getItem("pi_api_key");
@@ -142,7 +142,8 @@
 
         async function downloadFile(url, filename) {
             try {
-                const res = await fetch(url, {
+                const targetUrl = url.startsWith('http') ? url : API_BASE + url;
+                const res = await fetch(targetUrl, {
                     headers: getAuthHeaders()
                 });
 
