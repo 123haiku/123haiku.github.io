@@ -66,21 +66,56 @@
     <script>
         const API_BASE = "https://api.ngc6543.tech";
 
+        // ---------- 客户端侧的三道门 ----------
+        // 注意：真正的鉴权在服务端（secrets.compare_digest）。
+        // 这里只是减少把 key 到处塞 + 减少误把任意 URL 发出去。
+        const ALLOWED_HOSTS = [
+            "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
+            "instagram.com", "www.instagram.com",
+            "tiktok.com", "www.tiktok.com", "vm.tiktok.com",
+            "facebook.com", "www.facebook.com", "fb.watch",
+            "x.com", "www.x.com", "twitter.com", "www.twitter.com",
+        ];
+
+        // key 只放 sessionStorage：关标签页即失效，不会有长期驻留副本
         function getApiKey() {
-            let key = localStorage.getItem("pi_api_key");
+            let key = sessionStorage.getItem("pi_api_key");
             if (!key) {
                 key = prompt("Enter your Raspberry Pi Access Key:");
-                if (key) localStorage.setItem("pi_api_key", key);
+                if (key) sessionStorage.setItem("pi_api_key", key.trim());
             }
             return key || "";
         }
 
+        function clearApiKey() {
+            sessionStorage.removeItem("pi_api_key");
+        }
+
         function getAuthHeaders(extraHeaders = {}) {
             return {
-                "ngrok-skip-browser-warning": "true",
                 "X-API-Key": getApiKey(),
                 ...extraHeaders
             };
+        }
+
+        // 与后端同一条规则，只是浏览器侧先拦一层
+        function isAllowedHost(rawUrl) {
+            let u;
+            try { u = new URL(rawUrl); } catch { return false; }
+            if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+            // 字面量 IP 一律拒绝（挡 127.0.0.1 / 192.168.x / 169.254.x）
+            if (/^\d{1,3}(\.\d{1,3}){3}$/.test(u.hostname)) return false;
+            if (u.hostname.startsWith("[") || u.hostname.includes(":")) return false;
+            const h = u.hostname.toLowerCase().replace(/\.$/, "");
+            return ALLOWED_HOSTS.some(s => h === s || h.endsWith("." + s));
+        }
+
+        // 429 / 401 统一给用户一句人话
+        function explainStatus(res, data) {
+            if (res.status === 401) { clearApiKey(); return "Invalid API key. Reload to re-enter."; }
+            if (res.status === 429) return "Too many requests, wait a minute.";
+            if (res.status === 400) return (data && data.detail) ? String(data.detail) : "Request rejected.";
+            return (data && (data.detail || data.message)) || ("HTTP " + res.status);
         }
 
         function createVideoListItem(v) {
@@ -121,7 +156,7 @@
                 });
                 
                 if (res.status === 401) {
-                    localStorage.removeItem("pi_api_key");
+                    clearApiKey();
                     listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">Unauthorized: Invalid API key. Refresh to re-enter.</li>`;
                     return;
                 }
@@ -181,6 +216,13 @@
                     const res = await fetch(`${API_BASE}/api/progress/${taskId}`, {
                         headers: getAuthHeaders()
                     });
+                    if (res.status === 401) {
+                        clearInterval(interval);
+                        clearApiKey();
+                        status.innerText = "API key rejected. Reload to re-enter.";
+                        status.style.color = "#ef4444";
+                        return;
+                    }
                     if (!res.ok) return;
 
                     const data = await res.json();
@@ -224,6 +266,13 @@
                 return;
             }
 
+            // 客户端先挡一层，服务端还会再挡一次
+            if (!isAllowedHost(url)) {
+                status.innerText = "Only YouTube / Instagram / TikTok / Facebook / X video links are supported.";
+                status.style.color = "#f87171";
+                return;
+            }
+
             btn.disabled = true;
             btn.style.opacity = "0.6";
             status.innerText = "Submitting download task...";
@@ -236,12 +285,12 @@
                     body: JSON.stringify({ url: url })
                 });
 
-                const data = await res.json();
+                const data = await res.json().catch(() => ({}));
                 if (res.ok && data.task_id) {
                     input.value = "";
                     pollProgress(data.task_id);
                 } else {
-                    status.innerText = "Error: " + (data.detail || data.message || "Failed to start download");
+                    status.innerText = "Error: " + explainStatus(res, data);
                     status.style.color = "#f87171";
                 }
             } catch (err) {
