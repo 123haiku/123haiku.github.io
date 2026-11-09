@@ -43,6 +43,7 @@
                 style="background: none; border: 1px solid #555; color: #a1a1aa; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px;">Refresh</button>
         </div>
 
+        <p id="list-hint" style="margin: 8px 0 0; font-size: 12px; color: #71717a;"></p>
         <ul id="video-list" style="list-style: none; padding: 0; margin-top: 12px; max-height: 220px; overflow-y: auto;">
             <li style="color: #71717a; font-size: 13px;">Loading completed files...</li>
         </ul>
@@ -59,6 +60,7 @@
                 <div>CPU Usage: <span id="stat-cpu" style="color: #fff;">--</span></div>
                 <div>RAM: <span id="stat-ram" style="color: #fff;">--</span></div>
                 <div>Disk Free: <span id="stat-disk" style="color: #fff;">--</span></div>
+                <div>Your quota: <span id="stat-quota" style="color: #fff;">--</span></div>
             </div>
         </div>
     </div>
@@ -66,54 +68,43 @@
     <script>
         const API_BASE = "https://api.ngc6543.tech";
 
-        // ---------- 客户端侧的三道门 ----------
-        // 注意：真正的鉴权在服务端（secrets.compare_digest）。
-        // 这里只是减少把 key 到处塞 + 减少误把任意 URL 发出去。
+        // Public site: there is no key anywhere in this page.
+        // All gating lives on the Pi: per-IP token bucket, per-IP daily
+        // download quota, global concurrency cap, disk watermark.
+        // The browser only does two things: reject URLs that are obviously
+        // not video sites (fewer pointless requests reach the server), and
+        // translate 429/503 into one readable sentence.
         const ALLOWED_HOSTS = [
-            "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
-            "instagram.com", "www.instagram.com",
-            "tiktok.com", "www.tiktok.com", "vm.tiktok.com",
-            "facebook.com", "www.facebook.com", "fb.watch",
-            "x.com", "www.x.com", "twitter.com", "www.twitter.com",
+            "youtube.com", "youtu.be",
+            "instagram.com",
+            "tiktok.com",
+            "facebook.com", "fb.watch",
+            "x.com", "twitter.com",
+            "vimeo.com", "dailymotion.com", "twitch.tv",
+            "reddit.com", "soundcloud.com", "bilibili.com",
         ];
 
-        // key 只放 sessionStorage：关标签页即失效，不会有长期驻留副本
-        function getApiKey() {
-            let key = sessionStorage.getItem("pi_api_key");
-            if (!key) {
-                key = prompt("Enter your Raspberry Pi Access Key:");
-                if (key) sessionStorage.setItem("pi_api_key", key.trim());
-            }
-            return key || "";
-        }
-
-        function clearApiKey() {
-            sessionStorage.removeItem("pi_api_key");
-        }
-
-        function getAuthHeaders(extraHeaders = {}) {
-            return {
-                "X-API-Key": getApiKey(),
-                ...extraHeaders
-            };
-        }
-
-        // 与后端同一条规则，只是浏览器侧先拦一层
+        // Same rule as the server, applied earlier to catch typos and pastes.
         function isAllowedHost(rawUrl) {
             let u;
             try { u = new URL(rawUrl); } catch { return false; }
             if (u.protocol !== "http:" && u.protocol !== "https:") return false;
-            // 字面量 IP 一律拒绝（挡 127.0.0.1 / 192.168.x / 169.254.x）
+            // Refuse bare IP literals: 127.0.0.1 / 192.168.x / 169.254.x
             if (/^\d{1,3}(\.\d{1,3}){3}$/.test(u.hostname)) return false;
             if (u.hostname.startsWith("[") || u.hostname.includes(":")) return false;
             const h = u.hostname.toLowerCase().replace(/\.$/, "");
             return ALLOWED_HOSTS.some(s => h === s || h.endsWith("." + s));
         }
 
-        // 429 / 401 统一给用户一句人话
+        // One human sentence for every non-2xx path.
         function explainStatus(res, data) {
-            if (res.status === 401) { clearApiKey(); return "Invalid API key. Reload to re-enter."; }
-            if (res.status === 429) return "Too many requests, wait a minute.";
+            if (res.status === 429) {
+                const ra = res.headers.get("Retry-After");
+                return "Busy right now - " + (data && data.detail ? data.detail : "try again in a bit")
+                     + (ra ? ` (retry in ${ra}s)` : "");
+            }
+            if (res.status === 503) return (data && data.detail) || "Server is out of space, try later.";
+            if (res.status === 401) return "This endpoint is locked. The public site should never need a key.";
             if (res.status === 400) return (data && data.detail) ? String(data.detail) : "Request rejected.";
             return (data && (data.detail || data.message)) || ("HTTP " + res.status);
         }
@@ -132,7 +123,10 @@
 
             const sizeSpan = document.createElement("span");
             sizeSpan.style.cssText = "color: #71717a; font-size: 12px;";
-            sizeSpan.textContent = `${v.size_mb} MB (Deletes after saving)`;
+            const age = (typeof v.age_min === "number")
+                ? (v.age_min < 60 ? `${v.age_min} min ago` : `${Math.round(v.age_min / 60)} h ago`)
+                : "";
+            sizeSpan.textContent = `${v.size_mb} MB${age ? " - " + age : ""} - auto-deletes`;
 
             infoDiv.appendChild(nameSpan);
             infoDiv.appendChild(document.createElement("br"));
@@ -141,7 +135,13 @@
             const saveBtn = document.createElement("button");
             saveBtn.textContent = "Save";
             saveBtn.style.cssText = "background: #2563eb; color: #fff; padding: 6px 12px; border-radius: 4px; border: none; font-size: 12px; font-weight: bold; cursor: pointer;";
-            saveBtn.addEventListener("click", () => downloadFile(v.download_url, v.filename));
+            // Top-level navigation: the browser handles Content-Disposition
+            // itself, so no fetch, no CORS, no redirect that fetch could eat.
+            saveBtn.addEventListener("click", () => {
+                window.location.href = v.download_url.startsWith("http")
+                    ? v.download_url
+                    : API_BASE + v.download_url;
+            });
 
             li.appendChild(infoDiv);
             li.appendChild(saveBtn);
@@ -150,55 +150,30 @@
 
         async function fetchCompletedVideos() {
             const listEl = document.getElementById("video-list");
+            const hintEl = document.getElementById("list-hint");
             try {
-                const res = await fetch(`${API_BASE}/api/videos?t=${Date.now()}`, {
-                    headers: getAuthHeaders()
-                });
-                
-                if (res.status === 401) {
-                    clearApiKey();
-                    listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">Unauthorized: Invalid API key. Refresh to re-enter.</li>`;
+                const res = await fetch(`${API_BASE}/api/videos?t=${Date.now()}`, { cache: "no-store" });
+
+                if (!res.ok) {
+                    listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">${explainStatus(res, {})}</li>`;
                     return;
                 }
 
                 const data = await res.json();
                 listEl.innerHTML = "";
 
+                if (hintEl && typeof data.ttl_hours === "number") {
+                    hintEl.textContent = `Files are removed automatically after ${data.ttl_hours} h.`;
+                }
+
                 if (!data.videos || data.videos.length === 0) {
-                    listEl.innerHTML = `<li style="color: #71717a; font-size: 13px;">No completed videos available.</li>`;
+                    listEl.innerHTML = `<li style="color: #71717a; font-size: 13px;">No files on the Pi right now. Paste a link above.</li>`;
                     return;
                 }
 
                 data.videos.forEach(v => listEl.appendChild(createVideoListItem(v)));
             } catch (err) {
-                listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">Failed to connect to Pi.</li>`;
-            }
-        }
-
-        async function downloadFile(url, filename) {
-            try {
-                const targetUrl = url.startsWith('http') ? url : API_BASE + url;
-                const res = await fetch(targetUrl, {
-                    headers: getAuthHeaders()
-                });
-
-                if (!res.ok) throw new Error("Download request failed");
-
-                const blob = await res.blob();
-                const blobUrl = window.URL.createObjectURL(blob);
-
-                const tempAnchor = document.createElement("a");
-                tempAnchor.href = blobUrl;
-                tempAnchor.download = filename;
-                document.body.appendChild(tempAnchor);
-                tempAnchor.click();
-
-                document.body.removeChild(tempAnchor);
-                window.URL.revokeObjectURL(blobUrl);
-
-                setTimeout(fetchCompletedVideos, 1000);
-            } catch (err) {
-                alert("Failed to download video file from Raspberry Pi.");
+                listEl.innerHTML = `<li style="color: #ef4444; font-size: 13px;">Failed to reach the Pi. It may be offline.</li>`;
             }
         }
 
@@ -210,20 +185,26 @@
             const status = document.getElementById("dl-status");
 
             container.style.display = "block";
+            let misses = 0;
 
             const interval = setInterval(async () => {
                 try {
-                    const res = await fetch(`${API_BASE}/api/progress/${taskId}`, {
-                        headers: getAuthHeaders()
-                    });
-                    if (res.status === 401) {
-                        clearInterval(interval);
-                        clearApiKey();
-                        status.innerText = "API key rejected. Reload to re-enter.";
-                        status.style.color = "#ef4444";
+                    const res = await fetch(`${API_BASE}/api/progress/${taskId}`, { cache: "no-store" });
+
+                    if (res.status === 429) {
+                        // Read limiter: back off to one poll every 3s, no abort.
+                        meta.innerText = "throttled, slowing down...";
                         return;
                     }
-                    if (!res.ok) return;
+                    if (!res.ok) {
+                        if (++misses > 20) {
+                            clearInterval(interval);
+                            status.innerText = "Lost track of this task. Check the list below.";
+                            status.style.color = "#f87171";
+                        }
+                        return;
+                    }
+                    misses = 0;
 
                     const data = await res.json();
 
@@ -233,23 +214,23 @@
                         meta.innerText = `${data.speed} | ETA: ${data.eta}`;
                     } else if (data.status === "processing") {
                         bar.style.width = "100%";
-                        text.innerText = "Processing & Muxing audio/video...";
+                        text.innerText = "Processing and muxing audio/video...";
                         meta.innerText = "Almost done";
                     } else if (data.status === "completed") {
                         clearInterval(interval);
                         bar.style.width = "100%";
                         text.innerText = "Finished!";
                         meta.innerText = "";
-                        status.innerText = "Download complete! Ready in the list below.";
+                        status.innerText = "Ready - click Save on it below.";
                         status.style.color = "#4ade80";
                         fetchCompletedVideos();
                     } else if (data.status === "error") {
                         clearInterval(interval);
-                        status.innerText = "Download failed: " + (data.error || "Unknown error");
+                        status.innerText = "Download failed: " + (data.error || "unknown reason");
                         status.style.color = "#ef4444";
                     }
                 } catch (e) {
-                    console.error("Polling error", e);
+                    if (++misses > 20) clearInterval(interval);
                 }
             }, 1000);
         }
@@ -266,31 +247,34 @@
                 return;
             }
 
-            // 客户端先挡一层，服务端还会再挡一次
             if (!isAllowedHost(url)) {
-                status.innerText = "Only YouTube / Instagram / TikTok / Facebook / X video links are supported.";
+                status.innerText = "Supported: YouTube / Instagram / TikTok / Facebook / X / Vimeo / Reddit / SoundCloud / Bilibili.";
                 status.style.color = "#f87171";
                 return;
             }
 
             btn.disabled = true;
             btn.style.opacity = "0.6";
-            status.innerText = "Submitting download task...";
+            status.innerText = "Submitting...";
             status.style.color = "#a1a1aa";
 
             try {
                 const res = await fetch(`${API_BASE}/api/download`, {
                     method: "POST",
-                    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ url: url })
                 });
 
                 const data = await res.json().catch(() => ({}));
                 if (res.ok && data.task_id) {
                     input.value = "";
+                    if (typeof data.quota_left === "number") {
+                        status.innerText = `Queued. You have ${data.quota_left} download(s) left today.`;
+                        status.style.color = "#a1a1aa";
+                    }
                     pollProgress(data.task_id);
                 } else {
-                    status.innerText = "Error: " + explainStatus(res, data);
+                    status.innerText = explainStatus(res, data);
                     status.style.color = "#f87171";
                 }
             } catch (err) {
@@ -308,21 +292,25 @@
             const cpuEl = document.getElementById("stat-cpu");
             const ramEl = document.getElementById("stat-ram");
             const diskEl = document.getElementById("stat-disk");
+            const quotaEl = document.getElementById("stat-quota");
 
             try {
-                const res = await fetch(`${API_BASE}/api/stats`, {
-                    headers: getAuthHeaders()
-                });
-                if (!res.ok) throw new Error("Stats request rejected");
+                const res = await fetch(`${API_BASE}/api/stats`, { cache: "no-store" });
+                if (!res.ok) throw new Error("stats rejected");
 
                 const data = await res.json();
                 statusEl.innerText = "● Online";
                 statusEl.style.color = "#22c55e";
 
                 tempEl.innerText = data.cpu_temp_c ? `${data.cpu_temp_c}°C` : "N/A";
-                cpuEl.innerText = `${data.cpu_usage_pct}%`;
+                cpuEl.innerText = `${data.cpu_usage_pct ?? "--"}%`;
                 ramEl.innerText = `${data.ram_used_mb}MB / ${data.ram_total_mb}MB (${data.ram_pct}%)`;
                 diskEl.innerText = `${data.disk_free_gb}GB free / ${data.disk_total_gb}GB`;
+
+                if (quotaEl && data.your_quota) {
+                    quotaEl.innerText =
+                        `${data.your_quota.downloads_left_today} / ${data.your_quota.downloads_per_day} left today`;
+                }
             } catch (err) {
                 statusEl.innerText = "● Offline";
                 statusEl.style.color = "#ef4444";
@@ -332,7 +320,8 @@
         // Initialize UI
         fetchCompletedVideos();
         fetchPiStats();
-        setInterval(fetchPiStats, 5000);
+        setInterval(fetchPiStats, 10000);
+        setInterval(fetchCompletedVideos, 30000);
     </script>
 </body>
 </html>
