@@ -266,6 +266,14 @@
                 });
 
                 const data = await res.json().catch(() => ({}));
+                if (res.ok && data.status === "already downloaded" && data.download_url) {
+                    // The file is already on the Pi; skip the download entirely.
+                    input.value = "";
+                    status.innerText = "That video is already on the Pi - click Save below.";
+                    status.style.color = "#4ade80";
+                    fetchCompletedVideos();
+                    return;
+                }
                 if (res.ok && data.task_id) {
                     input.value = "";
                     if (typeof data.quota_left === "number") {
